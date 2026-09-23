@@ -92,3 +92,37 @@ pfSense's own DMZ interface (10.20.20.2) instead via netplan, and adding
 
 firewall rules allowing DNS queries specifically to pfSense itself.
 
+
+
+\## ELK Stack
+
+
+
+\- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 8 GB RAM, 40 GB disk
+
+\- Single NIC on Honeypot-MGMT only, static IP 10.20.30.10/24
+
+\- Elasticsearch 8.19.22 - security auto-enabled (TLS, built-in users),
+
+&#x20; password reset after initial install
+
+\- Kibana 8.19.22 - server.host set to 10.20.30.10 to allow access from
+
+&#x20; outside the VM, enrolled via token generated on Elasticsearch
+
+\- Logstash 8.19.22 - configured with:
+
+&#x20; - Beats input on port 5044 (for Filebeat from the honeypot)
+
+&#x20; - Elasticsearch output, indexing to cowrie-YYYY.MM.dd, using
+
+&#x20;   Elasticsearch's self-signed CA cert (copied from
+
+&#x20;   /etc/elasticsearch/certs/http\_ca.crt to /etc/logstash/)
+
+\- All three services verified running via systemctl and journalctl
+
+\- Firewall: LAN/MGMT interface uses pfSense's default "allow all" rule
+
+&#x20; (not internet-facing, so left as-is rather than restricted like DMZ)
+
