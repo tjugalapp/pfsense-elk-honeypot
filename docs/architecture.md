@@ -1,24 +1,24 @@
-\# Arkitektur
+\# Architecture
 
 
 
-\## Nätverk
+\## Network
 
 
 
-Tre nätverk skapade i Hyper-V:
+Three networks created in Hyper-V:
 
 
 
-\- \*\*Honeypot-WAN\*\* (External) – bryggad mot fysiskt Ethernet-kort (Realtek PCIe GbE), 
+\- \*\*Honeypot-WAN\*\* (External) - bridged to the physical Ethernet adapter (Realtek PCIe GbE),
 
-&#x20; ger pfSense riktig internetåtkomst
+&#x20; gives pfSense real internet access
 
-\- \*\*Honeypot-DMZ\*\* (Internal) – 10.20.20.0/24, isolerat nät där honeypotten placeras
+\- \*\*Honeypot-DMZ\*\* (Internal) - 10.20.20.0/24, isolated network where the honeypot sits
 
-\- \*\*Honeypot-MGMT\*\* (Internal) – 10.20.30.0/24, isolerat nät där ELK-stacken placeras
+\- \*\*Honeypot-MGMT\*\* (Internal) - 10.20.30.0/24, isolated network where the ELK stack sits
 
 
 
-Honeypot och ELK har ingen egen internetåtkomst – all trafik styrs via pfSense.
+The honeypot and ELK have no internet access of their own - all traffic is controlled via pfSense.
 
