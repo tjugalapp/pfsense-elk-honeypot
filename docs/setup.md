@@ -18,3 +18,77 @@
 
 \- Admin password changed from default during installation
 
+
+
+\## Honeypot (Cowrie)
+
+
+
+\- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 2 GB RAM, 20 GB disk
+
+\- Single NIC on Honeypot-DMZ only, static IP 10.20.20.10/24
+
+\- Cowrie 3.0.16 (source checkout, editable install via pip install -e .)
+
+\- Dedicated non-root service user: cowrie
+
+\- SSH honeypot on port 2222, Telnet honeypot on port 2223 (both enabled)
+
+\- Hostname set to "svr04" to avoid revealing it's a honeypot
+
+\- Default userdb.txt used as-is (blocks a few obvious honeypot-revealing
+
+&#x20; passwords like "honeypot" and "123456" against root, allows most others)
+
+\- Verified: login, fake shell interaction, and full JSON session logging
+
+&#x20; to var/log/cowrie/cowrie.json all working correctly
+
+
+
+\## Firewall: DMZ outbound lockdown
+
+
+
+Decided to restrict DMZ outbound traffic to TCP 80/443 only, rather than
+
+leaving it fully open or fully closed. This lets Cowrie capture real
+
+file download attempts from attackers (a built-in feature) while keeping
+
+the attack surface small. Cowrie runs in medium-interaction mode, so
+
+commands like wget in the fake shell are emulated by Cowrie itself and
+
+never reach the real OS - the main residual risk considered was a
+
+theoretical vulnerability in Cowrie/Python/Twisted itself allowing a
+
+breakout, in which case port 443 could be used for C2 traffic. Accepted
+
+this risk for a home lab given the mitigations (kept patched, logs
+
+monitored, rule can be disabled without breaking honeypot functionality).
+
+
+
+Rules on the DMZ interface:
+
+\- Allow DMZ outbound TCP 80 (HTTP)
+
+\- Allow DMZ outbound TCP 443 (HTTPS)
+
+\- Allow DMZ outbound UDP 53 to DMZ address (pfSense DNS resolver)
+
+\- Allow DMZ outbound TCP 53 to DMZ address (pfSense DNS resolver)
+
+
+
+Locking down outbound access broke DNS, since the honeypot was originally
+
+pointed at 1.1.1.1/8.8.8.8. Fixed by pointing the honeypot's DNS to
+
+pfSense's own DMZ interface (10.20.20.2) instead via netplan, and adding
+
+firewall rules allowing DNS queries specifically to pfSense itself.
+
