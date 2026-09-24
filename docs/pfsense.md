@@ -100,3 +100,61 @@ interface). Not internet-facing, so left as-is rather than restricted
 
 like DMZ.
 
+
+
+\## Port Forwarding (Home Router -> pfSense -> Honeypot)
+
+
+
+Two layers of NAT since pfSense sits behind the home router (double NAT):
+
+
+
+Home router (WAN services):
+
+\- SSH-honeypot: WAN port 2022 -> LAN 192.168.10.114:22
+
+\- Telnet-honeypot: WAN port 2023 -> LAN 192.168.10.114:23
+
+
+
+pfSense (Firewall -> NAT -> Port Forward):
+
+\- WAN:22 -> 10.20.20.10:2222 (Cowrie SSH)
+
+\- WAN:23 -> 10.20.20.10:2223 (Cowrie Telnet)
+
+
+
+Two ISP-related issues discovered during setup:
+
+\- Port 22 on the home router's WAN side is reserved by the ISP for
+
+&#x20; their own remote management - had to use an arbitrary external port
+
+&#x20; (2022) instead, forwarding internally to the expected port 22 that
+
+&#x20; pfSense's rule already listens for.
+
+\- Port 23 (Telnet) was silently blocked by the ISP outbound-to-inbound
+
+&#x20; (likely standard ISP-level filtering, common due to Telnet's history
+
+&#x20; with IoT botnets like Mirai) - same workaround, external port changed
+
+&#x20; to 2023.
+
+
+
+Verified externally using canyouseeme.org and a direct SSH connection
+
+from a mobile data connection (not on the home network) - both ports
+
+confirmed reachable from the real internet as of 2026-09-24.
+
+
+
+The honeypot is now exposed to real internet traffic. Standard port
+
+scanners and bots will typically discover it within hours to a few days.
+
