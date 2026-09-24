@@ -10,6 +10,4 @@ Quick index of how this lab is built. See the linked files for full detail on ea
 
 4\. [ELK Stack](elk-stack.md) - Elasticsearch/Kibana/Logstash, log pipeline, GeoIP enrichment, and dashboard
 
-Build order: network -> pfSense -> honeypot -> ELK stack -> log
-
-pipeline -> GeoIP/dashboard -> (next) port forwarding for real traffic.
+Build order: network -> pfSense -> honeypot -> ELK stack -> log pipeline -> GeoIP/dashboard -> (next) port forwarding for real traffic.
