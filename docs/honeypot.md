@@ -1,30 +1,25 @@
-\# Honeypot (Cowrie)
+# Honeypot (Cowrie)
 
+- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 2 GB RAM, 20 GB disk
 
+- Single NIC on Honeypot-DMZ only, static IP 10.20.20.10/24
 
-\- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 2 GB RAM, 20 GB disk
+- Cowrie 3.0.16 (source checkout, editable install via pip install -e .)
 
-\- Single NIC on Honeypot-DMZ only, static IP 10.20.20.10/24
+- Dedicated non-root service user: cowrie
 
-\- Cowrie 3.0.16 (source checkout, editable install via pip install -e .)
+- SSH honeypot on port 2222, Telnet honeypot on port 2223 (both enabled)
 
-\- Dedicated non-root service user: cowrie
+- Hostname set to "svr04" to avoid revealing it's a honeypot
 
-\- SSH honeypot on port 2222, Telnet honeypot on port 2223 (both enabled)
+- Default userdb.txt used as-is (blocks a few obvious honeypot-revealing
 
-\- Hostname set to "svr04" to avoid revealing it's a honeypot
+  passwords like "honeypot" and "123456" against root, allows most others)
 
-\- Default userdb.txt used as-is (blocks a few obvious honeypot-revealing
+- Verified: login, fake shell interaction, and full JSON session logging
 
-&#x20; passwords like "honeypot" and "123456" against root, allows most others)
-
-\- Verified: login, fake shell interaction, and full JSON session logging
-
-&#x20; to var/log/cowrie/cowrie.json all working correctly
-
-
+  to var/log/cowrie/cowrie.json all working correctly
 
 Firewall rules affecting this VM (DMZ outbound lockdown, DNS fix, and
 
-the log-shipping rule to ELK) are documented in \[pfsense.md](pfsense.md).
-
+the log-shipping rule to ELK) are documented in [pfsense.md](pfsense.md).

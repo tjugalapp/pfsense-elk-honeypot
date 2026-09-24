@@ -1,82 +1,66 @@
-\# ELK Stack
+# ELK Stack
 
+## Installation
 
+- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 8 GB RAM, 40 GB disk
 
-\## Installation
+- Single NIC on Honeypot-MGMT only, static IP 10.20.30.10/24
 
+- Elasticsearch 8.19.22 - security auto-enabled (TLS, built-in users),
 
+  password reset after initial install
 
-\- VM: Ubuntu Server 24.04 LTS, Generation 1, 2 vCPU, 8 GB RAM, 40 GB disk
+- Kibana 8.19.22 - server.host set to 10.20.30.10 to allow access from
 
-\- Single NIC on Honeypot-MGMT only, static IP 10.20.30.10/24
+  outside the VM, enrolled via token generated on Elasticsearch
 
-\- Elasticsearch 8.19.22 - security auto-enabled (TLS, built-in users),
+- Logstash 8.19.22 - configured with:
 
-&#x20; password reset after initial install
+  - Beats input on port 5044 (for Filebeat from the honeypot)
 
-\- Kibana 8.19.22 - server.host set to 10.20.30.10 to allow access from
+  - Elasticsearch output, indexing to cowrie-YYYY.MM.dd, using
 
-&#x20; outside the VM, enrolled via token generated on Elasticsearch
+    Elasticsearch's self-signed CA cert (copied from
 
-\- Logstash 8.19.22 - configured with:
+    /etc/elasticsearch/certs/http_ca.crt to /etc/logstash/)
 
-&#x20; - Beats input on port 5044 (for Filebeat from the honeypot)
+- All three services verified running via systemctl and journalctl
 
-&#x20; - Elasticsearch output, indexing to cowrie-YYYY.MM.dd, using
-
-&#x20;   Elasticsearch's self-signed CA cert (copied from
-
-&#x20;   /etc/elasticsearch/certs/http\_ca.crt to /etc/logstash/)
-
-\- All three services verified running via systemctl and journalctl
-
-
-
-Firewall: see \[pfsense.md](pfsense.md) for the MGMT/LAN and log-shipping
+Firewall: see [pfsense.md](pfsense.md) for the MGMT/LAN and log-shipping
 
 rules affecting this VM.
 
+## Log Pipeline: Cowrie -> Filebeat -> Logstash -> Elasticsearch -> Kibana
 
+- Filebeat 8.19.22 installed on the honeypot, configured with a filestream
 
-\## Log Pipeline: Cowrie -> Filebeat -> Logstash -> Elasticsearch -> Kibana
+  input reading /home/cowrie/cowrie/var/log/cowrie/cowrie.json, using an
 
+  ndjson parser (target: "") to flatten Cowrie's JSON fields directly to
 
+  the top level rather than nesting everything under "message"
 
-\- Filebeat 8.19.22 installed on the honeypot, configured with a filestream
+- Output: output.logstash pointed at 10.20.30.10:5044 (TLS not configured
 
-&#x20; input reading /home/cowrie/cowrie/var/log/cowrie/cowrie.json, using an
+  between Filebeat and Logstash - acceptable for an internal, already-
 
-&#x20; ndjson parser (target: "") to flatten Cowrie's JSON fields directly to
+  segmented lab network)
 
-&#x20; the top level rather than nesting everything under "message"
+- Verified end-to-end: created a Kibana Data View (cowrie-*), confirmed
 
-\- Output: output.logstash pointed at 10.20.30.10:5044 (TLS not configured
+  all 15 test session events appear in Discover with fields correctly
 
-&#x20; between Filebeat and Logstash - acceptable for an internal, already-
+  parsed (session, eventid, src_ip, username, password, message, etc.)
 
-&#x20; segmented lab network)
-
-\- Verified end-to-end: created a Kibana Data View (cowrie-\*), confirmed
-
-&#x20; all 15 test session events appear in Discover with fields correctly
-
-&#x20; parsed (session, eventid, src\_ip, username, password, message, etc.)
-
-
-
-\## GeoIP Enrichment and Map Visualization
-
-
+## GeoIP Enrichment and Map Visualization
 
 Added a geoip filter to the Logstash pipeline (10-geoip-filter.conf),
 
-enriching each event's src\_ip using the bundled GeoLite2-City database.
+enriching each event's src_ip using the bundled GeoLite2-City database.
 
 Target field set to "source" (not the default "geoip") to follow ECS
 
 naming conventions, after Logstash flagged a warning about this.
-
-
 
 Elasticsearch only creates field mappings the first time a field
 
@@ -88,41 +72,35 @@ fields never appeared in any document, so Kibana couldn't detect them
 
 as geospatial fields. Fixed by explicitly defining the mapping via an
 
-index template (applies to all future cowrie-\* indices) and a direct
+index template (applies to all future cowrie-* indices) and a direct
 
 mapping update on the current day's index - covers:
 
-source.geo.location (geo\_point), source.geo.country\_name,
+source.geo.location (geo_point), source.geo.country_name,
 
-source.geo.city\_name, source.geo.region\_name, source.geo.country\_code2.
+source.geo.city_name, source.geo.region_name, source.geo.country_code2.
 
-
-
-\## Kibana Dashboard
-
-
+## Kibana Dashboard
 
 Built a "Cowrie Honeypot Overview" dashboard with five panels:
 
-\- Events Over Time (line chart, date histogram on timestamp)
+- Events Over Time (line chart, date histogram on timestamp)
 
-\- Top Source IPs (table, terms on src\_ip)
+- Top Source IPs (table, terms on src_ip)
 
-\- Top Commands Executed (table, terms on message.keyword, filtered to
+- Top Commands Executed (table, terms on message.keyword, filtered to
 
-&#x20; eventid.keyword: cowrie.command.input)
+  eventid.keyword: cowrie.command.input)
 
-\- Login Outcomes (pie chart, terms on eventid.keyword, filtered to
+- Login Outcomes (pie chart, terms on eventid.keyword, filtered to
 
-&#x20; cowrie.login.success / cowrie.login.failed)
+  cowrie.login.success / cowrie.login.failed)
 
-\- Attacker Locations (Kibana Maps, Documents layer on
+- Attacker Locations (Kibana Maps, Documents layer on
 
-&#x20; source.geo.location, tooltips showing eventid, session,
+  source.geo.location, tooltips showing eventid, session,
 
-&#x20; source.geo.city\_name, source.geo.country\_name, username)
-
-
+  source.geo.city_name, source.geo.country_name, username)
 
 Current dashboard only reflects test session data (single source IP,
 
@@ -131,4 +109,3 @@ Current dashboard only reflects test session data (single source IP,
 look substantially more interesting once port forwarding exposes the
 
 honeypot to real internet traffic.
-
