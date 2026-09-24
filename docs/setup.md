@@ -1,8 +1,6 @@
 # Setup Overview
 
-Quick index of how this lab is built. See the linked files for full
-
-detail on each component.
+Quick index of how this lab is built. See the linked files for full detail on each component.
 
 1\. [Architecture](architecture.md) - network design, IP scheme
 
@@ -10,9 +8,7 @@ detail on each component.
 
 3\. [Honeypot](honeypot.md) - Cowrie installation and configuration
 
-4\. [ELK Stack](elk-stack.md) - Elasticsearch/Kibana/Logstash, log
-
-   pipeline, GeoIP enrichment, and dashboard
+4\. [ELK Stack](elk-stack.md) - Elasticsearch/Kibana/Logstash, log pipeline, GeoIP enrichment, and dashboard
 
 Build order: network -> pfSense -> honeypot -> ELK stack -> log
 
