@@ -14,6 +14,11 @@ I created three networks in Hyper-V:
 The honeypots and ELK have no internet access of their own. Everything
 goes through pfSense.
 
+![The Hyper-V switches](../screenshots/network-switches.png)
+
+*The switches in Hyper-V. "Default Switch" is Hyper-V's built-in one
+and isn't part of the lab.*
+
 ### Internal vs Private switches
 
 DMZ and MGMT use Hyper-V **Internal** switches, not **Private** ones.

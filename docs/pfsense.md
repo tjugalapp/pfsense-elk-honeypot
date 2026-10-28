@@ -11,6 +11,10 @@
 - SSH enabled on LAN, tested from the host (`ssh admin@10.20.30.2`)
 - Changed the default admin password during install
 
+![pfSense interface status](../screenshots/pfsense-status.png)
+
+*All three interfaces up, with the addresses above.*
+
 ## Firewall rules
 
 ### Locking down outbound traffic from the DMZ
@@ -55,6 +59,11 @@ access to whole subnets.
 - `10.20.20.10 -> 10.20.30.10:5044` (Cowrie)
 - `10.20.20.11 -> 10.20.30.10:5044` (Web-honeypot / SNARE + TANNER)
 
+![DMZ firewall rules in pfSense](../screenshots/pfsense-dmz-rules.png)
+
+*All rules on the DMZ interface: HTTP/HTTPS out, DNS only to pfSense,
+and the two log shipping rules to ELK.*
+
 ### MGMT/LAN
 
 Uses pfSense's default "allow all" rule on LAN. It isn't facing the
@@ -69,6 +78,8 @@ Home router:
 - SSH honeypot: WAN port 2022 -> LAN 192.168.10.114:22
 - Telnet honeypot: WAN port 2023 -> LAN 192.168.10.114:23
 - Web honeypot: WAN port 80 -> LAN 192.168.10.114:80
+
+![Port forwarding on the home router](../screenshots/router-port-forwarding.png)
 
 pfSense (Firewall -> NAT -> Port Forward):
 - WAN:22 -> 10.20.20.10:2222 (Cowrie SSH)

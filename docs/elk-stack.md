@@ -38,6 +38,11 @@ Firewall rules for this VM are in [pfsense.md](pfsense.md).
   message; TANNER: peer.ip, path, method, status, headers,
   response_msg.response.message.detection)
 
+![A Cowrie test session in Kibana Discover](../screenshots/kibana-discover-cowrie.png)
+
+*My own test session from inside the lab: a login and a few commands
+in the fake shell, all parsed into separate fields.*
+
 ## GeoIP and the map
 
 I added a geoip filter to the Logstash pipeline
