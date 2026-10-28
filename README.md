@@ -1,42 +1,45 @@
 # pfSense + ELK Honeypot Lab
 
-A segmented home lab combining pfSense, a Cowrie SSH/Telnet honeypot, a
-SNARE + TANNER web honeypot, and the ELK stack (Elasticsearch,
-Logstash, Kibana) - built to practice network segmentation, firewall
-rule design, and SOC-style log analysis against real internet traffic.
+A home lab I built while studying to become an IT security specialist.
+I wanted to see what real attack traffic looks like, and to practice
+firewall rules, network segmentation and log analysis on real data
+instead of a ready-made dataset.
 
-## Overview
+## What it does
 
-The lab exposes two deliberately isolated honeypots to the public
-internet via port forwarding - one for SSH/Telnet, one for web
-traffic - captures every interaction in structured JSON logs, ships
-them through a Filebeat -> Logstash -> Elasticsearch pipeline enriched
-with GeoIP data, and visualizes activity in a Kibana dashboard. The
-web honeypot additionally classifies incoming requests automatically
-(e.g. SQL injection, XSS, generic recon) via TANNER, rather than
-relying on manual log inspection alone.
+Two honeypots are exposed to the internet through port forwarding:
 
-## Architecture
+* **Cowrie** for SSH and Telnet
+* **SNARE + TANNER** for web traffic. TANNER also tries to classify
+  each request (for example SQL injection, XSS or plain recon), so I
+  don't have to sort everything by hand.
 
-Three segmented networks behind pfSense:
+Everything they log goes through Filebeat -> Logstash -> Elasticsearch,
+gets GeoIP data added, and ends up in a Kibana dashboard.
 
-* **WAN** - bridged to the home network, real internet access
-* **DMZ** (10.20.20.0/24) - both honeypots only, outbound traffic
-locked to HTTP/HTTPS + DNS to pfSense, no path to the management
-network
-* **MGMT** (10.20.30.0/24) - the ELK stack, reachable from DMZ only on
-the single port needed for log shipping (5044)
+## Network
 
-Full network design: [docs/architecture.md](docs/architecture.md)
+pfSense sits in front of everything and splits the lab into three
+networks:
 
-## Components
+* **WAN** - bridged to my home network, so the lab gets real internet
+  access
+* **DMZ** (10.20.20.0/24) - only the honeypots. They can reach
+  HTTP/HTTPS and DNS through pfSense, nothing else, and they can't
+  reach the management network
+* **MGMT** (10.20.30.0/24) - the ELK stack. The honeypots can only
+  reach it on port 5044, to send logs
 
-|Component|Details|
+More about the network: [docs/architecture.md](docs/architecture.md)
+
+## Parts
+
+|Part|What it is|
 |-|-|
-|[pfSense](docs/pfsense.md)|Firewall/router, interface segmentation, NAT rules, port forwarding|
-|[Honeypot](docs/honeypot.md)|Cowrie (SSH + Telnet), medium-interaction, JSON session logging|
-|[Web Honeypot](docs/web-honeypot.md)|SNARE + TANNER, cloned decoy site, automatic attack classification|
-|[ELK Stack](docs/elk-stack.md)|Log pipeline, GeoIP enrichment, Kibana dashboard|
+|[pfSense](docs/pfsense.md)|Firewall/router, network segments, NAT and port forwarding|
+|[Honeypot](docs/honeypot.md)|Cowrie (SSH + Telnet), logs every session as JSON|
+|[Web Honeypot](docs/web-honeypot.md)|SNARE + TANNER with a cloned decoy site|
+|[ELK Stack](docs/elk-stack.md)|Log pipeline, GeoIP, Kibana dashboard|
 
 ## Dashboard
 
@@ -44,19 +47,33 @@ Full network design: [docs/architecture.md](docs/architecture.md)
 
 ![Cowrie Honeypot Overview dashboard - part 2](screenshots/kibana-dashboard-2.png)
 
-Events over time, source IPs, credentials and commands attempted,
-web request paths and detection types, and attacker locations on a
-map - built in Kibana Lens and Maps, covering both honeypots.
+Shows events over time, source IPs, which usernames, passwords and
+commands were tried, which web paths were requested, and where the
+traffic comes from on a map. It covers both honeypots.
+
+## Things that went wrong
+
+A lot of the time went into fixing problems, and that's where I
+learned the most. A few examples, with details in the docs:
+
+* Turning on `ufw` after Docker was already running silently blocked
+  all traffic to the web honeypot, through the `FORWARD` chain
+  ([web-honeypot.md](docs/web-honeypot.md))
+* Two bugs in SNARE itself that I had to fix before it worked
+  ([web-honeypot.md](docs/web-honeypot.md))
+* Kibana couldn't show the map because my test traffic came from a
+  private IP, so the GeoIP fields were never created
+  ([elk-stack.md](docs/elk-stack.md))
+* My ISP blocks ports 22 and 23 from outside, so I had to use other
+  external ports ([pfsense.md](docs/pfsense.md))
 
 ## Investigations
 
-Notable activity captured after exposing the honeypots to the internet
-is documented in [investigations/](investigations/), one write-up per
-session - source, behavior, and a MITRE ATT\&CK mapping where applicable.
+When something interesting showed up, I wrote it down in
+[investigations/](investigations/): what happened, what I think it
+means, and a MITRE ATT\&CK mapping where it fits. I tried to keep what
+the logs actually show separate from my own guesses.
 
 ## Status
 
-Live since 2026-09-24, actively receiving internet traffic on both
-honeypots.
-
-
+The lab went live on 2026-09-24 and is shut down now.

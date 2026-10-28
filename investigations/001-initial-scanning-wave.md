@@ -1,51 +1,72 @@
-# Investigation 001: Initial Scanning Wave (First 24h of Exposure)
+# Investigation 001: The first 24 hours
 
 ## Summary
 
-Within the first 24 hours of exposing the honeypot to the internet (2026-09-24), it received traffic from at least 7 distinct external source IPs. No successful or attempted logins occurred, and no commands were executed in the fake shell. All observed activity is consistent with automated internet-wide scanning infrastructure rather than targeted or manual attacker behavior.
+I opened the honeypot to the internet on 2026-09-24. During the first
+24 hours, at least 7 different external IPs connected. Nobody tried to
+log in and no commands were run. Everything looks like automated
+scanning, not someone actually targeting the honeypot.
 
-## Sources Observed
+## Who connected
 
-- **52.202.215.126** - AWS (us-east-1) - cloud-hosted scanner
-- **8.209.83.42** - Alibaba Cloud (Frankfurt) - cloud-hosted scanner
-- **162.216.150.148** - Google Cloud (us-east1) - cloud-hosted scanner
-- **85.217.149.1, .3, .9, .13, .15, .39** - Modat B.V. (AS209334) - dedicated internet-scanning service
+- **52.202.215.126** - AWS (us-east-1)
+- **8.209.83.42** - Alibaba Cloud (Frankfurt)
+- **162.216.150.148** - Google Cloud (us-east1)
+- **85.217.149.1, .3, .9, .13, .15, .39** - Modat B.V. (AS209334)
 
-The Modat addresses all fall within Modat's published scanner ranges (85.217.140.0/24, 85.217.149.0/24), confirming they belong to a known, purpose-built scanning operation (comparable to Shodan/Censys) rather than a botnet or individual attacker.
+The Modat addresses are inside the ranges Modat publishes for its
+scanners (85.217.140.0/24, 85.217.149.0/24). So that's a known scanning
+service, similar to Shodan or Censys, not a botnet.
 
-## Technical Findings
+## What I found
 
-### Protocol-blind probing (session ab0944ec0fbc, src 85.217.149.1)
+### A TLS handshake sent to the SSH port
 
-Timeline:
+Session ab0944ec0fbc, from 85.217.149.1:
 
 1. `New connection: 85.217.149.1:53310` (SSH port 2222)
-2. `cowrie.client.version` - payload was not an SSH version string, but the raw bytes `\x16\x03\x01\x00\xee\x01\x00\x00\xea\x03...`
+2. `cowrie.client.version` - instead of an SSH version string, the
+   client sent the raw bytes `\x16\x03\x01\x00\xee\x01\x00\x00\xea\x03...`
 3. `Connection lost after 2 milliseconds`
 
-The byte sequence `\x16\x03\x01` is the standard TLS record header for a ClientHello (0x16 = handshake record, 0x03 0x01 = TLS 1.0). This means the scanner sent a generic TLS handshake probe against a port that only speaks SSH, and disconnected within 2ms without waiting for a meaningful response. **Interpretation:** this indicates a protocol-blind scanning approach - the same probe(s) fired at every open port discovered, regardless of the port's actual protocol, rather than an SSH-specific scanner performing a proper handshake. This is consistent with high-throughput internet-wide scanning, which optimizes for breadth of coverage over depth of interaction per target.
+`\x16\x03\x01` is the start of a TLS ClientHello (0x16 = handshake,
+0x03 0x01 = TLS 1.0). So the scanner sent a TLS handshake to a port that
+only speaks SSH, and hung up after 2 ms.
 
-### SSH client version strings observed
+My interpretation: it sends the same probe to every open port it
+finds, without checking what service is actually running there. That
+fits a scanner that wants to cover as many hosts as possible, fast.
 
-Other sessions did complete a valid SSH version exchange:
+### SSH versions
 
-- `SSH-2.0-Go` - consistent with a Go-based scanning tool
+Other sessions did a normal SSH version exchange:
+
+- `SSH-2.0-Go` - probably a scanning tool written in Go
 - `SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu1`
 - `SSH-2.0-OpenSSH_for_Windows_9.5`
 
-These may be genuine SSH client implementations used by scanning tools, or spoofed banners designed to blend in with legitimate traffic. No further interaction (login attempt, command execution) followed any of these version exchanges.
+These could be the real clients the scanners use, or fake banners. I
+can't tell from this data. None of them did anything after the version
+exchange.
 
-### GeoIP caveat
+### A note on the map
 
-The Kibana map plots these sessions in the US, Germany, and Canada. This reflects the geographic location of the cloud/hosting infrastructure the scanner runs from, not necessarily the physical location of the operator - an important distinction when interpreting GeoIP data from cloud-hosted sources.
+The Kibana map puts these sessions in the US, Germany and Canada. That
+is where the servers are hosted, not necessarily where the person
+running the scan is.
 
-## MITRE ATT&CK Mapping
+## MITRE ATT&CK
 
-- **Active Scanning: Scanning IP Blocks (T1595.001)** - broad, non-targeted probing across the exposed IP/port
-- **Active Scanning: Vulnerability Scanning (T1595.002)** - protocol-blind TLS probe against an SSH port, consistent with generic service/vulnerability fingerprinting
+- **Active Scanning: Scanning IP Blocks (T1595.001)** - broad scanning,
+  nothing targeted
+- **Active Scanning: Vulnerability Scanning (T1595.002)** - the TLS
+  probe against the SSH port looks like generic service fingerprinting
 
-No techniques beyond the Reconnaissance stage were observed - no credential access, execution, or persistence activity occurred.
+Nothing beyond reconnaissance: no login attempts, no commands, no
+persistence.
 
 ## Conclusion
 
-The first 24 hours of exposure produced exclusively reconnaissance traffic from known scanning infrastructure (AWS, Alibaba Cloud, Google Cloud, and the dedicated Modat scanning service). No brute force attempts, credential testing, or shell interaction occurred. This is a typical and expected pattern for a newly internet-facing honeypot - discovery by scanning services generally precedes targeted or automated brute-force activity, which is expected as the honeypot's exposure becomes more widely indexed over time.
+The first day was only scanning from known scanning services. As far
+as I understand, that's normal for a newly exposed IP: scanning
+services find it first, and brute-force attempts usually come later.

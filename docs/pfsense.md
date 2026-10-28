@@ -4,109 +4,100 @@
 
 - VM: Generation 1, 2 vCPU, 2 GB RAM, 20 GB disk (UFS)
 - pfSense CE 2.9.0-RELEASE
-- Interface assignment:
-  - WAN (hn0) -> Honeypot-WAN, DHCP from home router (192.168.10.114/24)
+- Interfaces:
+  - WAN (hn0) -> Honeypot-WAN, DHCP from the home router (192.168.10.114/24)
   - LAN (hn2) -> Honeypot-MGMT, static 10.20.30.2/24
   - DMZ/OPT1 (hn1) -> Honeypot-DMZ, static 10.20.20.2/24
-- SSH enabled on LAN, access confirmed from the host machine (ssh admin@10.20.30.2)
-- Admin password changed from default during installation
+- SSH enabled on LAN, tested from the host (`ssh admin@10.20.30.2`)
+- Changed the default admin password during install
 
-## Firewall Rules
+## Firewall rules
 
-### DMZ outbound lockdown
+### Locking down outbound traffic from the DMZ
 
-Decided to restrict DMZ outbound traffic to TCP 80/443 only, rather than
-leaving it fully open or fully closed. This lets Cowrie capture real
-file download attempts from attackers (a built-in feature) while keeping
-the attack surface small. Cowrie runs in medium-interaction mode, so
-commands like wget in the fake shell are emulated by Cowrie itself and
-never reach the real OS - the main residual risk considered was a
-theoretical vulnerability in Cowrie/Python/Twisted itself allowing a
-breakout, in which case port 443 could be used for C2 traffic. Accepted
-this risk for a home lab given the mitigations (kept patched, logs
-monitored, rule can be disabled without breaking honeypot functionality).
+I didn't want the DMZ fully open, but not fully closed either, so I
+only allowed TCP 80 and 443 out. That way Cowrie can still record when
+attackers try to download files (it has a built-in feature for that),
+but the attack surface stays small.
+
+Cowrie runs in medium-interaction mode, so commands like `wget` in the
+fake shell are handled by Cowrie and never reach the real OS. The risk
+I thought about was a bug in Cowrie/Python/Twisted that would let
+someone break out and then use port 443 for C2 traffic. For a home lab
+I accepted that, since I kept it patched, watched the logs, and the
+rule could be turned off without breaking the honeypot.
 
 Rules on the DMZ interface:
 - Allow DMZ outbound TCP 80 (HTTP)
 - Allow DMZ outbound TCP 443 (HTTPS)
-- Allow DMZ outbound UDP 53 to DMZ address (pfSense DNS resolver)
-- Allow DMZ outbound TCP 53 to DMZ address (pfSense DNS resolver)
+- Allow DMZ outbound UDP 53 to the DMZ address (pfSense DNS resolver)
+- Allow DMZ outbound TCP 53 to the DMZ address (pfSense DNS resolver)
 
-Locking down outbound access broke DNS, since the honeypot was originally
-pointed at 1.1.1.1/8.8.8.8. Fixed by pointing the honeypot's DNS to
-pfSense's own DMZ interface (10.20.20.2) instead via netplan, and adding
-firewall rules allowing DNS queries specifically to pfSense itself.
+Locking down outbound traffic broke DNS, because the honeypot was set
+to use 1.1.1.1/8.8.8.8. I fixed it by pointing the honeypot's DNS at
+pfSense's own DMZ address (10.20.20.2) with netplan, and adding rules
+that allow DNS only to pfSense.
 
-Also required enabling the DNS Resolver on the DMZ interface itself
-(Services > DNS Resolver > Network Interfaces), alongside Localhost -
-pfSense relies on the resolver via 127.0.0.1 for its own lookups, so
-Localhost had to stay selected alongside DMZ rather than DMZ alone.
+I also had to enable the DNS Resolver on the DMZ interface (Services >
+DNS Resolver > Network Interfaces). Localhost had to stay selected too,
+since pfSense uses the resolver via 127.0.0.1 for its own lookups.
 
-The default WAN "Block private networks" and "Block bogon networks"
-rules remain enabled - confirmed active (non-zero blocked-traffic
-counters) after initial concern that their red "block" icon indicated
-they were disabled.
+The default WAN rules "Block private networks" and "Block bogon
+networks" are still on. Their red "block" icon made me think they were
+disabled at first, but the counters showed they were blocking traffic.
 
 ### DMZ -> MGMT (log shipping)
 
-Narrow rules allowing only each honeypot's specific IP to reach the
-ELK VM's specific IP on TCP 5044 (Filebeat -> Logstash). Kept as tight
-as possible even though DMZ is otherwise locked down - no broader DMZ
-subnet or MGMT-wide access granted.
+Only each honeypot's IP is allowed to reach the ELK VM's IP, on TCP
+5044 (Filebeat -> Logstash). I kept it as narrow as I could, with no
+access to whole subnets.
 
 - `10.20.20.10 -> 10.20.30.10:5044` (Cowrie)
 - `10.20.20.11 -> 10.20.30.10:5044` (Web-honeypot / SNARE + TANNER)
 
 ### MGMT/LAN
 
-Uses pfSense's default "allow all" rule (auto-created on the LAN
-interface). Not internet-facing, so left as-is rather than restricted
-like DMZ.
+Uses pfSense's default "allow all" rule on LAN. It isn't facing the
+internet, so I left it as it was.
 
-## Port Forwarding (Home Router -> pfSense -> Honeypot)
+## Port forwarding (home router -> pfSense -> honeypot)
 
-Two layers of NAT since pfSense sits behind the home router (double NAT):
+Since pfSense sits behind my home router, there are two layers of NAT
+(double NAT):
 
-Home router (WAN services):
-- SSH-honeypot: WAN port 2022 -> LAN 192.168.10.114:22
-- Telnet-honeypot: WAN port 2023 -> LAN 192.168.10.114:23
-- Web-honeypot: WAN port 80 -> LAN 192.168.10.114:80
+Home router:
+- SSH honeypot: WAN port 2022 -> LAN 192.168.10.114:22
+- Telnet honeypot: WAN port 2023 -> LAN 192.168.10.114:23
+- Web honeypot: WAN port 80 -> LAN 192.168.10.114:80
 
 pfSense (Firewall -> NAT -> Port Forward):
 - WAN:22 -> 10.20.20.10:2222 (Cowrie SSH)
 - WAN:23 -> 10.20.20.10:2223 (Cowrie Telnet)
 - WAN:80 -> 10.20.20.11:80 (Web-honeypot / SNARE)
 
-Two ISP-related issues discovered during setup:
-- Port 22 on the home router's WAN side is reserved by the ISP for
-  their own remote management - had to use an arbitrary external port
-  (2022) instead, forwarding internally to the expected port 22 that
-  pfSense's rule already listens for.
-- Port 23 (Telnet) was silently blocked by the ISP outbound-to-inbound
-  (likely standard ISP-level filtering, common due to Telnet's history
-  with IoT botnets like Mirai) - same workaround, external port changed
-  to 2023.
+Two problems with my ISP:
+- Port 22 on the router's WAN side is reserved by the ISP for their own
+  remote management. I used port 2022 on the outside instead, forwarded
+  to port 22 inside so the pfSense rule still matched.
+- Port 23 (Telnet) was blocked by the ISP. My guess is normal ISP
+  filtering, since Telnet is a common target for IoT botnets like
+  Mirai. Same fix: port 2023 on the outside.
 
-Port 80 had no such ISP reservation and was mapped directly with no
-workaround needed.
+Port 80 worked directly.
 
-Verified externally using canyouseeme.org and a direct SSH connection
-from a mobile data connection (not on the home network) - all three
-ports confirmed reachable from the real internet.
+I checked from outside with canyouseeme.org and by connecting over SSH
+from mobile data. All three ports were reachable from the internet.
 
-The honeypots are now exposed to real internet traffic. Standard port
-scanners and bots typically discover a newly-exposed IP within hours
-to a few days.
+## ufw on the honeypot VMs
 
-## Host-level firewalling (ufw) on the honeypot VMs
+On the web honeypot VM I also used `ufw` to limit TANNER's admin ports
+(8090/8091) to local access. That was harder than expected, because of
+how `ufw` and Docker work together:
 
-Beyond pfSense, `ufw` is used on the Web-honeypot VM to restrict
-TANNER's admin interfaces (ports 8090/8091) to local access only. This
-surfaced two non-obvious issues worth noting here since they affect
-how host-level firewalling interacts with both Docker and pfSense's
-own network topology - see [Web Honeypot](web-honeypot.md) for the
-full detail: `ufw` rules targeting `INPUT` do not restrict
-Docker-published ports (which route through `FORWARD`), and enabling
-`ufw` after Docker is already running can leave the `FORWARD` chain's
-default policy set to deny, silently blocking all Docker-forwarded
-traffic including pfSense's own port-forwarded connections.
+- `ufw` rules on `INPUT` don't cover ports that Docker publishes, since
+  that traffic goes through `FORWARD`
+- Turning on `ufw` after Docker was already running set the `FORWARD`
+  chain's default policy to deny. That silently blocked all traffic to
+  the containers, including the port forwarding from pfSense
+
+Details in [Web Honeypot](web-honeypot.md).
